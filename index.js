@@ -1,21 +1,5 @@
 const robot = require('robotjs')
 const os = require('os')
-const cliProgress = require('cli-progress')
-const colors = require('colors')
-
-// Initialize the progress bar
-const progressBar = new cliProgress.SingleBar(
-  {
-    format:
-      'Mouse Movement Progress |' +
-      colors.cyan('{bar}') +
-      '| {percentage}% | {value}/{total} Cycles',
-    barCompleteChar: '\u2588',
-    barIncompleteChar: '\u2591',
-    hideCursor: true,
-  },
-  cliProgress.Presets.shades_classic
-)
 
 /**
  * Main function to move the mouse across the screen with random patterns and speeds.
@@ -30,8 +14,6 @@ const progressBar = new cliProgress.SingleBar(
 
   const startTime = Date.now()
   let cycleCount = 0
-  const totalCycles = 100 // Set the total number of cycles for the progress bar
-  progressBar.start(totalCycles, 0)
 
   /**
    * Function to format elapsed time in HH:MM:SS.
@@ -139,13 +121,6 @@ const progressBar = new cliProgress.SingleBar(
     randomPattern()
     cycleCount++
     displayStats()
-    progressBar.update(cycleCount)
-
-    if (cycleCount >= totalCycles) {
-      progressBar.stop()
-      clearInterval(interval)
-      displaySummary()
-    }
   }
 
   // Set an interval to move the mouse and display stats every second
@@ -161,6 +136,7 @@ const progressBar = new cliProgress.SingleBar(
     const memoryUsage = process.memoryUsage().rss / (1024 * 1024) // Convert from bytes to MB
     const cpuUsage = os.loadavg()[0] // Get the 1-minute load average
 
+    console.clear()
     console.log('\nSummary:')
     console.log(`Start Time: ${startTimeFormatted}`)
     console.log(`End Time: ${endTimeFormatted}`)
