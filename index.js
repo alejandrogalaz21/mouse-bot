@@ -1,7 +1,12 @@
-const robot = require('robotjs')
+const { mouse, screen, Point } = require('@nut-tree-fork/nut-js')
 const os = require('os')
 const cliProgress = require('cli-progress')
 const colors = require('colors')
+
+// Mouse movement speed config
+mouse.config.mouseSpeed = 2000
+mouse.config.autoDelayMs = 0
+const MOVE_DELAY = 5 // ms delay between each step (higher = slower)
 
 // Initialize the progress bar
 const progressBar = new cliProgress.SingleBar(
@@ -85,88 +90,56 @@ const displayStats = () => {
   console.log(`CPU Usage: ${cpuUsage.toFixed(2)}%`)
 }
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
 /**
- * Move the mouse in a sine wave pattern.
+ * Move the mouse graphing the digits of Pi.
+ * Each digit (3.14159265358979...) becomes a height on screen.
  */
-const moveMouseInSineWave = () => {
-  const twoPI = Math.PI * 2.0
-  progressBar.start(width, 0)
-  for (let x = 0; x < width; x++) {
-    const y = height * Math.sin((twoPI * x) / width) + height
-    robot.moveMouse(x, y)
-    progressBar.update(x + 1)
+const moveMouseInPiGraph = async (width, height) => {
+  const piDigits = '3141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067982148086513282306647'
+  const totalDigits = piDigits.length
+  const segmentWidth = width / totalDigits
+  const totalSteps = totalDigits * Math.floor(segmentWidth)
+  const maxDigit = 9
+  const margin = 50
+
+  progressBar.start(totalSteps, 0)
+  let stepCount = 0
+
+  for (let d = 0; d < totalDigits; d++) {
+    const digit = parseInt(piDigits[d])
+    const nextDigit = d < totalDigits - 1 ? parseInt(piDigits[d + 1]) : digit
+
+    const yFrom = margin + ((maxDigit - digit) / maxDigit) * (height - margin)
+    const yTo = margin + ((maxDigit - nextDigit) / maxDigit) * (height - margin)
+
+    const stepsInSegment = Math.floor(segmentWidth)
+    for (let s = 0; s < stepsInSegment; s++) {
+      const t = s / stepsInSegment
+      const x = d * segmentWidth + s
+      const y = yFrom + (yTo - yFrom) * t // smooth interpolation between digits
+      await mouse.setPosition(new Point(Math.round(x), Math.round(y)))
+      stepCount++
+      progressBar.update(stepCount)
+      await sleep(MOVE_DELAY)
+    }
   }
+
   progressBar.stop()
   cycleCount++
   displayStats()
 }
 
 /**
- * Move the mouse in a zigzag pattern.
+ * Main function to move the mouse with Pi pattern.
  */
-const moveMouseInZigzag = () => {
-  const step = 20
-  progressBar.start(width / step, 0)
-  for (let x = 0; x < width; x += step) {
-    const y = (x / step) % 2 === 0 ? height - 20 : height + 20
-    robot.moveMouse(x, y)
-    progressBar.update(x / step + 1)
-  }
-  progressBar.stop()
-  cycleCount++
-  displayStats()
-}
-
-/**
- * Move the mouse in a circular pattern.
- */
-const moveMouseInCircle = () => {
-  const radius = height / 2
-  const centerX = width / 2
-  const centerY = height
-  const steps = 360
-  progressBar.start(steps, 0)
-  for (let angle = 0; angle < 360; angle++) {
-    const radian = (angle * Math.PI) / 180
-    const x = centerX + radius * Math.cos(radian)
-    const y = centerY + radius * Math.sin(radian)
-    robot.moveMouse(x, y)
-    progressBar.update(angle + 1)
-  }
-  progressBar.stop()
-  cycleCount++
-  displayStats()
-}
-
-/**
- * Randomly select a movement pattern.
- */
-const getRandomPattern = () => {
-  const patterns = [moveMouseInSineWave, moveMouseInZigzag, moveMouseInCircle]
-  return patterns[Math.floor(Math.random() * patterns.length)]
-}
-
-/**
- * Main function to move the mouse with random speed and pattern.
- */
-const moveMouseRandomly = () => {
-  const randomPattern = getRandomPattern()
-  const randomDelay = Math.floor(Math.random() * 5) + 1 // Random delay between 1 and 5 ms
-  robot.setMouseDelay(randomDelay)
-
-  // Change the color of the progress bar for the current cycle
+const moveMouseCycle = async (width, height) => {
   currentColor = getRandomColor()
-  progressBar.barCompleteChar = currentColor('\u2588') // Update the bar complete character color
+  progressBar.barCompleteChar = currentColor('\u2588')
 
-  randomPattern() // Execute the selected pattern
+  await moveMouseInPiGraph(width, height)
 }
-
-const screenSize = robot.getScreenSize()
-const height = screenSize.height / 2 - 10
-const width = screenSize.width
-
-// Set an interval to move the mouse and display stats every 2 seconds
-const interval = setInterval(moveMouseRandomly, 2000)
 
 /**
  * Display the summary when the program is terminated.
@@ -191,3 +164,25 @@ const displaySummary = () => {
 
 // Listen for the program termination (CTRL + C)
 process.on('SIGINT', displaySummary)
+
+// Main entry point
+async function main() {
+  const screenWidth = await screen.width()
+  const screenHeight = await screen.height()
+  const height = screenHeight / 2 - 10
+  const width = screenWidth
+
+  displayStats()
+
+  // Run mouse movement loop every 2 seconds
+  const loop = async () => {
+    while (true) {
+      await moveMouseCycle(width, height)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
+
+  loop()
+}
+
+main().catch(console.error)
